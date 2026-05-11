@@ -1,2 +1,2 @@
-pywin32
-pytest
+pywin32>=306
+pytest>=7.0
