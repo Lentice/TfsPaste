@@ -131,7 +131,7 @@ class TfsPasterApp:
         if cfg.pre_shrink_html:
             html = pre_shrink_html(html)
 
-        html = patch_images(html, source_url, self._is_browser_active, t, _log.info)
+        html = patch_images(html, source_url, self._is_browser_active, t)
 
         if not self._browser_active:
             restore_clipboard(self._clipboard_backup)

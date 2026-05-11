@@ -1,3 +1,4 @@
+import logging
 import re
 import time
 import os
@@ -10,7 +11,10 @@ from clipboard import put_file_to_clipboard, wait_clipboard_idle, read_html
 from html_processor import to_pixel
 from keyboard import send_ctrl, send_key, send_backspace
 
+_log = logging.getLogger(__name__)
+
 _IMG_EXTS = r'\.(?:gif|jpg|bmp|png|jpeg|apng|svg|tif|tiff|ico|cur|webp)'
+
 
 def get_src_from_html(html: str, tag_name: str) -> Optional[tuple[str, str]]:
     pattern = rf'(?is)<{re.escape(tag_name)}[^>]+src="(?!https?://)([^"]*{_IMG_EXTS}\??[^"]*)"'
@@ -19,6 +23,7 @@ def get_src_from_html(html: str, tag_name: str) -> Optional[tuple[str, str]]:
         return None
     ext_m = re.search(_IMG_EXTS, m.group(1), re.IGNORECASE)
     return (m.group(1), ext_m.group(0)) if ext_m else None
+
 
 def get_style_value(html: str, name: str, conv_to_pixel: bool = False) -> Optional[object]:
     pattern = rf'(?si)[\s\n]style=[^>]*?["\';s]{re.escape(name)}:(.*?)[;"\']'
@@ -32,6 +37,7 @@ def get_style_value(html: str, name: str, conv_to_pixel: bool = False) -> Option
         except ValueError:
             return None
     return val
+
 
 def get_file_path(path: str, source_url: str) -> Optional[str]:
     m = re.match(r'^file:/+(.*)$', path)
@@ -47,6 +53,7 @@ def get_file_path(path: str, source_url: str) -> Optional[str]:
                 return candidate
     return None
 
+
 def parse_remote_url_from_clip() -> Optional[str]:
     html = read_html()
     if not html:
@@ -54,13 +61,13 @@ def parse_remote_url_from_clip() -> Optional[str]:
     m = re.search(r'(?i)src="(https?[^"]+)"', html)
     return m.group(1) if m else None
 
+
 def upload_to_web(
     filepath: str,
     is_browser_active: Callable[[], bool],
     timing,
-    log: Callable[[str], None],
 ) -> Optional[str]:
-    log(f"Uploading: {filepath}")
+    _log.info("Uploading: %s", filepath)
     if not put_file_to_clipboard(filepath):
         return None
     if not is_browser_active():
@@ -75,7 +82,7 @@ def upload_to_web(
     send_ctrl(ord('V'), timing.key_press_duration_ms, timing.paste_delay_ms)
 
     if not wait_clipboard_idle(timing.clipboard_idle_timeout_ms, timing.clipboard_poll_interval_ms):
-        log("ERROR: Clipboard idle timeout after paste")
+        _log.warning("Clipboard idle timeout after paste")
         return None
 
     time.sleep(timing.image_upload_after_ms / 1000)
@@ -87,12 +94,12 @@ def upload_to_web(
         send_ctrl(ord('C'), timing.key_press_duration_ms, timing.copy_delay_ms)
 
         if not wait_clipboard_idle(timing.clipboard_idle_timeout_ms, timing.clipboard_poll_interval_ms):
-            log("ERROR: Clipboard idle timeout after copy")
+            _log.warning("Clipboard idle timeout after copy")
             return None
 
         url = parse_remote_url_from_clip()
         if url:
-            log(f"Got URL: {url}")
+            _log.info("Got URL: %s", url)
             time.sleep(max(timing.operation_interval_ms, 50) / 1000)
             send_key(win32con.VK_BACK, timing.key_press_duration_ms)
             return url
@@ -101,23 +108,24 @@ def upload_to_web(
             return None
         time.sleep(timing.image_capture_poll_interval_ms / 1000)
 
-    log("ERROR: Image capture timeout")
+    _log.warning("Image capture timeout")
     return None
+
 
 def patch_images(
     html: str,
     source_url: str,
     is_browser_active: Callable[[], bool],
     timing,
-    log: Callable[[str], None],
 ) -> str:
     if is_browser_active():
-        html = _patch_exist_img(html, source_url, is_browser_active, timing, log)
+        html = _patch_exist_img(html, source_url, is_browser_active, timing)
     if is_browser_active():
-        html = _patch_v_shape(html, source_url, is_browser_active, timing, log)
+        html = _patch_v_shape(html, source_url, is_browser_active, timing)
     return html
 
-def _patch_exist_img(html, source_url, is_browser_active, timing, log) -> str:
+
+def _patch_exist_img(html, source_url, is_browser_active, timing) -> str:
     for img in re.findall(r'(?s)(<img[^>]+src="[^">]+".*?>)', html):
         info = get_src_from_html(img, 'img')
         if not info:
@@ -125,7 +133,7 @@ def _patch_exist_img(html, source_url, is_browser_active, timing, log) -> str:
         fp = get_file_path(info[0], source_url)
         if not fp:
             continue
-        url = upload_to_web(fp, is_browser_active, timing, log)
+        url = upload_to_web(fp, is_browser_active, timing)
         if not is_browser_active():
             return html
         if url:
@@ -133,23 +141,25 @@ def _patch_exist_img(html, source_url, is_browser_active, timing, log) -> str:
             html = html.replace(img, new_img, 1)
     return html
 
-def _patch_v_shape(html, source_url, is_browser_active, timing, log) -> str:
+
+def _patch_v_shape(html, source_url, is_browser_active, timing) -> str:
     for vs in re.findall(r'(?s)(<v:shape\s.*?</v:shape>)', html):
-        img_tag = _vshape_to_img(vs, source_url, is_browser_active, timing, log)
+        img_tag = _vshape_to_img(vs, source_url, is_browser_active, timing)
         if img_tag:
             html = html.replace(vs, img_tag, 1)
         if not is_browser_active():
             return html
     return html
 
-def _vshape_to_img(vs, source_url, is_browser_active, timing, log) -> Optional[str]:
+
+def _vshape_to_img(vs, source_url, is_browser_active, timing) -> Optional[str]:
     info = get_src_from_html(vs, 'v:imagedata')
     if not info:
         return None
     fp = get_file_path(info[0], source_url)
     if not fp:
         return None
-    url = upload_to_web(fp, is_browser_active, timing, log)
+    url = upload_to_web(fp, is_browser_active, timing)
     if not url:
         return None
 
