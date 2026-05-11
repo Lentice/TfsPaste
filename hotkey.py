@@ -1,13 +1,17 @@
 import ctypes
 import ctypes.wintypes
+import logging
 import threading
 from typing import Callable
+
+_log = logging.getLogger(__name__)
 
 WM_HOTKEY = 0x0312
 WM_QUIT = 0x0012
 MOD_ALT = 0x0001
 MOD_CTRL = 0x0002
 MOD_SHIFT = 0x0004
+
 
 class HotkeyListener:
     def __init__(self, ctrl: bool, alt: bool, shift: bool, key: str, callback: Callable[[], None]):
@@ -25,16 +29,23 @@ class HotkeyListener:
         self._thread.start()
 
     def stop(self) -> None:
+        _log.debug("Unregistering hotkey id=%d", self._hotkey_id)
         ctypes.windll.user32.UnregisterHotKey(None, self._hotkey_id)
         if self._thread.ident:
             ctypes.windll.user32.PostThreadMessageA(self._thread.ident, WM_QUIT, 0, 0)
 
     def _run(self) -> None:
+        ctypes.windll.user32.UnregisterHotKey(None, self._hotkey_id)
         if not ctypes.windll.user32.RegisterHotKey(None, self._hotkey_id, self._modifiers, self._vk):
-            raise RuntimeError(f"RegisterHotKey failed (already registered?)")
+            _log.error("RegisterHotKey failed (mod=%d, vk=%d) — already registered?",
+                       self._modifiers, self._vk)
+            raise RuntimeError("RegisterHotKey failed (already registered?)")
+        _log.debug("Hotkey registered (id=%d, mod=%d, vk=%d)",
+                   self._hotkey_id, self._modifiers, self._vk)
         msg = ctypes.wintypes.MSG()
         while ctypes.windll.user32.GetMessageA(ctypes.byref(msg), None, 0, 0) != 0:
             if msg.message == WM_HOTKEY and msg.wParam == self._hotkey_id:
+                _log.debug("Hotkey triggered")
                 threading.Thread(target=self._callback, daemon=True).start()
             ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
             ctypes.windll.user32.DispatchMessageA(ctypes.byref(msg))
