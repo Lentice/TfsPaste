@@ -9,6 +9,12 @@ _log = logging.getLogger(__name__)
 
 CF_HTML: int = win32clipboard.RegisterClipboardFormat("HTML Format")
 
+# These formats use GDI handles that cannot be round-tripped as raw bytes
+_SKIP_ON_BACKUP: frozenset[int] = frozenset({
+    3,   # CF_METAFILEPICT - requires GetMetafileBitsEx
+    14,  # CF_ENHMETAFILE  - requires SetEnhMetaFileBits to restore
+})
+
 
 def _try_open(hwnd: int = 0) -> bool:
     try:
@@ -37,6 +43,9 @@ def backup_clipboard() -> dict:
     try:
         fmt = win32clipboard.EnumClipboardFormats(0)
         while fmt:
+            if fmt in _SKIP_ON_BACKUP:
+                fmt = win32clipboard.EnumClipboardFormats(fmt)
+                continue
             try:
                 data = win32clipboard.GetClipboardData(fmt)
                 if isinstance(data, bytes):
