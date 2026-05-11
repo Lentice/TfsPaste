@@ -3,6 +3,7 @@ import os
 import time
 import logging
 import threading
+import subprocess
 from pathlib import Path
 
 import win32api
@@ -13,6 +14,7 @@ from config import load_config, AppConfig
 from gui import StatusWindow
 from hotkey import HotkeyListener
 from keyboard import send_ctrl, send_key, send_backspace
+from logger import setup_logging
 from clipboard import (
     backup_clipboard, restore_clipboard, read_html, write_html,
     wait_clipboard_idle,
@@ -25,12 +27,24 @@ from image_handler import patch_images
 
 _INI_PATH = Path(__file__).parent / 'Config.ini'
 _LOG_PATH = Path(os.environ['TEMP']) / 'TFS Paster' / 'TFS Paster Log'
+_PID_FILE = Path(os.environ['TEMP']) / 'TFS Paster' / 'tfs_paster.pid'
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='[%(asctime)s.%(msecs)03d] %(message)s',
-    datefmt='%H:%M:%S',
-)
+
+def _enforce_single_instance() -> None:
+    _PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if _PID_FILE.exists():
+        try:
+            old_pid = int(_PID_FILE.read_text().strip())
+            result = subprocess.run(
+                ['taskkill', '/F', '/PID', str(old_pid)],
+                capture_output=True, check=False,
+            )
+            if result.returncode == 0:
+                time.sleep(0.3)
+        except (ValueError, OSError):
+            pass
+    _PID_FILE.write_text(str(os.getpid()))
+
 _log = logging.getLogger(__name__)
 
 _BROWSERS = ('- Google Chrome', '— Mozilla Firefox', '- Microsoft​ Edge')
@@ -180,7 +194,9 @@ class TfsPasterApp:
 
 
 def main() -> None:
+    _enforce_single_instance()
     cfg = load_config(_INI_PATH)
+    setup_logging(cfg.debug, cfg.log_console, cfg.log_file)
     app = TfsPasterApp(cfg)
 
     if len(sys.argv) > 1 and sys.argv[1] == 'Quiet':
