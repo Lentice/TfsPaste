@@ -51,3 +51,21 @@ def test_debug_flag(tmp_path):
     ini = write_ini(tmp_path, '[General]\nDebug=1\n')
     cfg = load_config(ini)
     assert cfg.debug == True
+
+def test_log_defaults(tmp_path):
+    ini = write_ini(tmp_path, '[General]\n')
+    cfg = load_config(ini)
+    assert cfg.log_console == True
+    assert cfg.log_file == True
+
+
+def test_log_console_disabled(tmp_path):
+    ini = write_ini(tmp_path, '[General]\nLogConsole=0\n')
+    cfg = load_config(ini)
+    assert cfg.log_console == False
+
+
+def test_log_file_disabled(tmp_path):
+    ini = write_ini(tmp_path, '[General]\nLogFile=0\n')
+    cfg = load_config(ini)
+    assert cfg.log_file == False

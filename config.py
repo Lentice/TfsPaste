@@ -28,6 +28,8 @@ class HotkeyConfig:
 @dataclass
 class AppConfig:
     debug: bool = False
+    log_console: bool = True
+    log_file: bool = True
     pre_shrink_html: bool = False
     post_shrink_html: bool = False
     hotkey: HotkeyConfig = field(default_factory=HotkeyConfig)
@@ -64,6 +66,8 @@ def load_config(ini_path: str | Path) -> AppConfig:
 
     return AppConfig(
         debug=p.getboolean('General', 'Debug', fallback=False),
+        log_console=p.getboolean('General', 'LogConsole', fallback=True),
+        log_file=p.getboolean('General', 'LogFile', fallback=True),
         pre_shrink_html=p.getboolean('General', 'PreShrinkHtml', fallback=False),
         post_shrink_html=p.getboolean('General', 'PostShrinkHtml', fallback=False),
         hotkey=hotkey,
