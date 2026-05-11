@@ -35,9 +35,16 @@ def _enforce_single_instance() -> None:
     if _PID_FILE.exists():
         try:
             old_pid = int(_PID_FILE.read_text().strip())
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0  # SW_HIDE
             result = subprocess.run(
                 ['taskkill', '/F', '/PID', str(old_pid)],
-                capture_output=True, check=False,
+                capture_output=True,
+                check=False,
+                creationflags=creationflags,
+                startupinfo=startupinfo,
             )
             if result.returncode == 0:
                 time.sleep(0.3)
