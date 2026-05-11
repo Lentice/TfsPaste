@@ -1,12 +1,17 @@
+import logging
 import tkinter as tk
 from typing import Callable
+
+_log = logging.getLogger(__name__)
 
 _COLOR_NORMAL = '#000000'
 _COLOR_SUCCESS = '#388E3C'
 _COLOR_ERROR = '#d32f2f'
 
+
 class StatusWindow:
     def __init__(self, hotkey_label: str, on_exit: Callable[[], None]):
+        _log.debug("StatusWindow creating (hotkey=%s)", hotkey_label)
         self._root = tk.Tk()
         self._root.title('TFS Paster')
         self._root.attributes('-topmost', True)
@@ -55,4 +60,5 @@ class StatusWindow:
         ))
 
     def run(self) -> None:
+        _log.debug("StatusWindow mainloop starting")
         self._root.mainloop()
