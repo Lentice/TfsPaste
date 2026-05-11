@@ -199,7 +199,7 @@ def main() -> None:
     setup_logging(cfg.debug, cfg.log_console, cfg.log_file)
     app = TfsPasterApp(cfg)
 
-    if len(sys.argv) > 1 and sys.argv[1] == 'Quiet':
+    if len(sys.argv) > 1 and sys.argv[1].lower() == 'quiet':
         app.do_job()
         return
 
