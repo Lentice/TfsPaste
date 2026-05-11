@@ -125,7 +125,7 @@ class TfsPasterApp:
             self._save_debug('Source.html', html)
 
         source_url = get_source_url(html)
-        _log.info(f'SourceURL: {source_url}')
+        _log.info("SourceURL: %s", source_url)
 
         self._normal('Patching HTML...')
         if cfg.pre_shrink_html:
@@ -188,8 +188,8 @@ class TfsPasterApp:
         self._gui = StatusWindow(label, self._on_exit)
         self._listener = HotkeyListener(hk.ctrl, hk.alt, hk.shift, hk.key, self._on_hotkey)
         self._listener.start()
-        _log.info(f'Hotkey: {label}')
-        _log.info(f'Log path: {_LOG_PATH}')
+        _log.info("Hotkey: %s", label)
+        _log.info("Debug dump path: %s", _LOG_PATH)
         self._gui.run()
 
 
